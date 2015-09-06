@@ -1,0 +1,4 @@
+[package]
+name = "concurrent_queue"
+version = "0.1.0"
+authors = ["Johannes Hoff <jhoff@newrelic.com>"]
