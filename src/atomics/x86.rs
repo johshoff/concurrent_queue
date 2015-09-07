@@ -80,14 +80,14 @@ pub fn fetch_and_add(destination: &mut u64, addend: u64) -> u64 {
 pub fn test_and_set(destination: &mut u64) {
     unsafe {
         asm!("LOCK XCHG qword ptr [RCX], RBX"
-             :                              // output
+             :                                 // output
 
-             : "{rbx}"(0xffffffffffffffff), // input
+             : "{rbx}"(0xffffffffffffffffu64), // input
                "{rcx}"(destination)
 
-             : "{rbx}", "memory"            // clobbers
+             : "{rbx}", "memory"               // clobbers
 
-             : "intel"                      // options
+             : "intel"                         // options
         );
     }
 }
@@ -125,5 +125,12 @@ mod test {
 	    assert!(!compare_and_swap_2(&mut x, &DoubleU64 { high: 1, low: 2 }, &DoubleU64 { high: 3, low: 2 }));
 	    assert_eq!(x.high, 2);
 	    assert_eq!(x.low , 3);
+    }
+
+    #[test]
+    fn test_test_and_set() {
+        let mut x = 5;
+        test_and_set(&mut x);
+        assert_eq!(x, 0xffffffffffffffffu64);
     }
 }
