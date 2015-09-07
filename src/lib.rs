@@ -1,3 +1,6 @@
+#![feature(asm)]
+#![feature(repr_simd)]
+
 use std::ptr;
 use std::mem;
 
@@ -7,16 +10,15 @@ use flag_and_u63::FlagAndU63;
 pub mod node; // TODO: Using `pub` only to suppress unused warnings
 use node::{ Node, NODE_VALUE_EMPTY };
 
-mod atomics;
-use atomics::polyfill;
-use atomics::polyfill::{ fetch_and_add, test_and_set, compare_and_swap };
+pub mod atomics; // TODO: Using `pub` only to suppress unused warnings
+use atomics::x86::*;
 
-fn compare_and_swap_2(node: &mut Node, expected: &Node, new_value: &Node) -> bool {
-    let mem_current   : &mut [u64; 2] = unsafe { mem::transmute(node)      };
-    let mem_expected  : &    [u64; 2] = unsafe { mem::transmute(expected)  };
-    let mem_new_value : &    [u64; 2] = unsafe { mem::transmute(new_value) };
+fn compare_and_swap_nodes(node: &mut Node, expected: &Node, new_value: &Node) -> bool {
+    let mem_current   : &mut DoubleU64 = unsafe { mem::transmute(node)      };
+    let mem_expected  : &    DoubleU64 = unsafe { mem::transmute(expected)  };
+    let mem_new_value : &    DoubleU64 = unsafe { mem::transmute(new_value) };
 
-    polyfill::compare_and_swap_2(mem_current, mem_expected, mem_new_value)
+    compare_and_swap_2(mem_current, mem_expected, mem_new_value)
 }
 
 const RING_SIZE: usize = 4;
@@ -70,7 +72,7 @@ impl CRQ {
                     let (is_safe, index) = node.safe_and_index();
                     if index <= tail &&
                        (is_safe || self.head <= tail) &&
-                       compare_and_swap_2(node, &Node::new(index, NODE_VALUE_EMPTY, is_safe), &Node::new(tail, new_value, true)) {
+                       compare_and_swap_nodes(node, &Node::new(index, NODE_VALUE_EMPTY, is_safe), &Node::new(tail, new_value, true)) {
                         return Ok(());
                     }
                 }
@@ -109,16 +111,16 @@ impl CRQ {
 
                     if value != NODE_VALUE_EMPTY {
                         if index == head {
-                            if compare_and_swap_2(node, &Node::new(head, value, is_safe), &Node::new(head + RING_SIZE as u64, NODE_VALUE_EMPTY, is_safe)) {
+                            if compare_and_swap_nodes(node, &Node::new(head, value, is_safe), &Node::new(head + RING_SIZE as u64, NODE_VALUE_EMPTY, is_safe)) {
                                 return Some(value)
                             }
                         } else {
-                            if compare_and_swap_2(node, &Node::new(index, value, is_safe), &Node::new(index, value, false)) {
+                            if compare_and_swap_nodes(node, &Node::new(index, value, is_safe), &Node::new(index, value, false)) {
                                 break;
                             }
                         }
                     } else {
-                        if compare_and_swap_2(node, &Node::new(index, NODE_VALUE_EMPTY, is_safe), &Node::new(head + RING_SIZE as u64, NODE_VALUE_EMPTY, is_safe)) {
+                        if compare_and_swap_nodes(node, &Node::new(index, NODE_VALUE_EMPTY, is_safe), &Node::new(head + RING_SIZE as u64, NODE_VALUE_EMPTY, is_safe)) {
                             break;
                         }
                     }
