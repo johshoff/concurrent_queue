@@ -82,7 +82,10 @@ impl CRQ {
                 }
             }
 
-            if (tail - self.head) as usize >= RING_SIZE || self.is_starving() {
+            // NOTE: Checking `head < tail` is necessary to avoid underflow in `tail - head`, since
+            // head can advance beyond tail
+            let head = self.head;
+            if (head < tail && (tail - head) as usize >= RING_SIZE) || self.is_starving() {
                 test_and_set(self.tail_and_closed.ref_combined());
                 return Err(QueueClosed);
             }
