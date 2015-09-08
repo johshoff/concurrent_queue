@@ -1,6 +1,6 @@
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-pub fn compare_and_swap(destination: &mut u64, expected: u64, new_value: u64) -> bool {
+pub fn compare_and_swap(destination: &u64, expected: u64, new_value: u64) -> bool {
 	let value_at_dest : u64;
     unsafe {
         asm!("LOCK CMPXCHG qword ptr [RCX], RBX"
@@ -30,7 +30,7 @@ pub struct DoubleU64 {
 }
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-pub fn compare_and_swap_2(destination: &mut DoubleU64, expected: &DoubleU64, new_value: &DoubleU64) -> bool { // TODO: return Result to pass back values?
+pub fn compare_and_swap_2(destination: &DoubleU64, expected: &DoubleU64, new_value: &DoubleU64) -> bool { // TODO: return Result to pass back values?
 	let value_at_dest_high : u64;
 	let value_at_dest_low  : u64;
 
@@ -58,7 +58,7 @@ pub fn compare_and_swap_2(destination: &mut DoubleU64, expected: &DoubleU64, new
 }
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-pub fn fetch_and_add(destination: &mut u64, addend: u64) -> u64 {
+pub fn fetch_and_add(destination: &u64, addend: u64) -> u64 {
 	let value_at_dest : u64;
     unsafe {
         asm!("LOCK XADD qword ptr [RCX], RBX"
@@ -77,12 +77,12 @@ pub fn fetch_and_add(destination: &mut u64, addend: u64) -> u64 {
 }
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-pub fn test_and_set(destination: &mut u64) {
+pub fn test_and_set(destination: &u64) {
     unsafe {
         asm!("LOCK XCHG qword ptr [RCX], RBX"
              :                                 // output
 
-             : "{rbx}"(0xffffffffffffffffu64), // input
+             : "{rbx}"(0x8000000000000000u64), // input
                "{rcx}"(destination)
 
              : "{rbx}", "memory"               // clobbers
@@ -131,6 +131,6 @@ mod test {
     fn test_test_and_set() {
         let mut x = 5;
         test_and_set(&mut x);
-        assert_eq!(x, 0xffffffffffffffffu64);
+        assert_eq!(x, 0x8000000000000000u64);
     }
 }

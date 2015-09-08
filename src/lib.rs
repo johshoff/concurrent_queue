@@ -3,6 +3,7 @@
 
 use std::ptr;
 use std::mem;
+use std::marker::{Sync, Send};
 
 pub mod flag_and_u63; // TODO: Using `pub` only to suppress unused warnings
 use flag_and_u63::FlagAndU63;
@@ -13,15 +14,15 @@ use node::{ Node, NODE_VALUE_EMPTY };
 pub mod atomics; // TODO: Using `pub` only to suppress unused warnings
 use atomics::x86::*;
 
-fn compare_and_swap_nodes(node: &mut Node, expected: &Node, new_value: &Node) -> bool {
-    let mem_current   : &mut DoubleU64 = unsafe { mem::transmute(node)      };
-    let mem_expected  : &    DoubleU64 = unsafe { mem::transmute(expected)  };
-    let mem_new_value : &    DoubleU64 = unsafe { mem::transmute(new_value) };
+fn compare_and_swap_nodes(node: &Node, expected: &Node, new_value: &Node) -> bool {
+    let mem_current   : &DoubleU64 = unsafe { mem::transmute(node)      };
+    let mem_expected  : &DoubleU64 = unsafe { mem::transmute(expected)  };
+    let mem_new_value : &DoubleU64 = unsafe { mem::transmute(new_value) };
 
     compare_and_swap_2(mem_current, mem_expected, mem_new_value)
 }
 
-const RING_SIZE: usize = 4;
+pub const RING_SIZE: usize = 4;
 
 pub struct CRQ { // TODO: ensure fields are on distinct cache lines
     head: u64,   // read location
@@ -29,6 +30,9 @@ pub struct CRQ { // TODO: ensure fields are on distinct cache lines
     next: *mut CRQ,
     ring: [Node; RING_SIZE]
 }
+
+unsafe impl Send for CRQ {} // TODO: remove need for this
+unsafe impl Sync for CRQ {}
 
 pub struct QueueClosed;
 
@@ -55,9 +59,9 @@ impl CRQ {
         CRQ { head: 0, tail_and_closed: FlagAndU63::new(false, 0), next: ptr::null_mut(), ring: ring }
     }
 
-    pub fn enqueue(&mut self, new_value: u64) -> Result<(), QueueClosed> {
+    pub fn enqueue(&self, new_value: u64) -> Result<(), QueueClosed> {
         loop {
-            let current_tail_and_closed = FlagAndU63::from_repr(fetch_and_add(self.tail_and_closed.mut_ref_combined(), 1));
+            let current_tail_and_closed = FlagAndU63::from_repr(fetch_and_add(self.tail_and_closed.ref_combined(), 1));
             let (closed, tail) = current_tail_and_closed.flag_and_value();
 
             if closed {
@@ -65,7 +69,7 @@ impl CRQ {
             }
 
             {
-                let node = &mut self.ring[tail as usize % RING_SIZE]; // TODO: are we doing a range check? not needed
+                let node = &self.ring[tail as usize % RING_SIZE]; // TODO: are we doing a range check? not needed
                 let value = node.value();
 
                 if value == NODE_VALUE_EMPTY {
@@ -79,14 +83,14 @@ impl CRQ {
             }
 
             if (tail - self.head) as usize >= RING_SIZE || self.is_starving() {
-                test_and_set(self.tail_and_closed.mut_ref_combined());
+                test_and_set(self.tail_and_closed.ref_combined());
                 return Err(QueueClosed);
             }
 
         }
     }
 
-    pub fn dequeue(&mut self) -> Option<u64> {
+    pub fn dequeue(&self) -> Option<u64> {
 /*
         // sync implementation
         let node = &self.ring[self.head as usize % RING_SIZE];
@@ -97,9 +101,9 @@ impl CRQ {
         }
 */
         loop {
-            let head = fetch_and_add(&mut self.head, 1);
+            let head = fetch_and_add(&self.head, 1);
             {
-                let node = &mut self.ring[head as usize % RING_SIZE]; // TODO: are we doing a range check? not needed
+                let node = &self.ring[head as usize % RING_SIZE]; // TODO: are we doing a range check? not needed
 
                 loop {
                     let value = node.value();
@@ -140,10 +144,10 @@ impl CRQ {
         false
     }
 
-    fn fix_state(&mut self) {
+    fn fix_state(&self) {
         loop {
-            let tail_repr = fetch_and_add(self.tail_and_closed.mut_ref_combined(), 0);
-            let head = fetch_and_add(&mut self.head, 0);
+            let tail_repr = fetch_and_add(self.tail_and_closed.ref_combined(), 0);
+            let head = fetch_and_add(&self.head, 0);
 
             if self.tail_and_closed.combined() != tail_repr {
                 continue;
@@ -156,53 +160,103 @@ impl CRQ {
             // jh: Since tail_repr < head at this point it means that tail_repr does not have a it's highest bit set (the CLOSED bit).
             //     Alternatively, it means that head has the highest bit set, and I guess that'll just close the queue?
 
-            if compare_and_swap(self.tail_and_closed.mut_ref_combined(), tail_repr, head) {
+            if compare_and_swap(self.tail_and_closed.ref_combined(), tail_repr, head) {
                 return;
             }
         }
     }
 }
 
-#[test]
-fn new_crq() {
-    let crq = CRQ::new();
-    assert_eq!(crq.head, 0);
-    assert_eq!(crq.tail_and_closed.value(), 0);
-    assert!(!crq.tail_and_closed.is_flag_set());
-    assert_eq!(crq.next, ptr::null_mut());
-    assert_eq!(crq.ring.len(), RING_SIZE);
+#[cfg(test)]
+mod test {
+    use std::sync::Arc;
+    use std::ptr;
+    use std::thread::spawn;
+    use super::*;
+    use node::NODE_VALUE_EMPTY;
 
-    for (i, element) in crq.ring.iter().enumerate() {
-        assert!(element.is_safe());
-        assert_eq!(element.index(), i as u64);
-        assert_eq!(element.value(), NODE_VALUE_EMPTY);
-    }
-}
+    #[test]
+    fn new_crq() {
+        let crq = CRQ::new();
+        assert_eq!(crq.head, 0);
+        assert_eq!(crq.tail_and_closed.value(), 0);
+        assert!(!crq.tail_and_closed.is_flag_set());
+        assert_eq!(crq.next, ptr::null_mut());
+        assert_eq!(crq.ring.len(), RING_SIZE);
 
-#[test]
-fn test_full_queue() {
-    let mut crq = CRQ::new();
-    for _ in 0..RING_SIZE {
-        assert!(crq.enqueue(100).is_ok());
-    }
-    assert!(crq.enqueue(100).is_err());
-}
-
-#[test]
-fn test_deque_empty() {
-    let mut crq = CRQ::new();
-    assert!(crq.dequeue() == None);
-}
-
-#[test]
-fn test_enqueue_and_deque() {
-    let mut crq = CRQ::new();
-    for i in 0..RING_SIZE {
-        assert!(crq.enqueue(100 + i as u64).is_ok());
+        for (i, element) in crq.ring.iter().enumerate() {
+            assert!(element.is_safe());
+            assert_eq!(element.index(), i as u64);
+            assert_eq!(element.value(), NODE_VALUE_EMPTY);
+        }
     }
 
-    for i in 0..RING_SIZE {
-        assert!(crq.dequeue() == Some(100 + i as u64));
+    #[test]
+    fn test_full_queue() {
+        let crq = CRQ::new();
+        for _ in 0..RING_SIZE {
+            assert!(crq.enqueue(100).is_ok());
+        }
+        assert!(crq.enqueue(100).is_err());
+    }
+
+    #[test]
+    fn test_deque_empty() {
+        let crq = CRQ::new();
+        assert!(crq.dequeue() == None);
+    }
+
+    #[test]
+    fn test_enqueue_and_deque() {
+        let crq = CRQ::new();
+        for i in 0..RING_SIZE {
+            assert!(crq.enqueue(100 + i as u64).is_ok());
+        }
+
+        for i in 0..RING_SIZE {
+            assert!(crq.dequeue() == Some(100 + i as u64));
+        }
+    }
+
+    #[test]
+    fn test_enqueue_and_deque_laps() {
+        let crq = CRQ::new();
+        for i in 0..RING_SIZE*10 {
+            assert!(crq.enqueue(100 + i as u64).is_ok());
+            assert!(crq.dequeue() == Some(100 + i as u64));
+        }
+    }
+
+    #[test]
+    fn test_enqueue_and_deque_multithreaded() {
+        let crq = Arc::new(CRQ::new());
+
+        let prod_crq = crq.clone();
+        let cons_crq = crq.clone();
+
+        let producer = spawn(move || {
+            for i in 0..RING_SIZE {
+                loop {
+                    match prod_crq.enqueue(100 + i as u64) {
+                        Ok(()) => { break; },
+                        Err(QueueClosed) => { panic!("Queue closed"); },
+                    }
+                }
+            }
+        });
+
+        let consumer = spawn(move || {
+            for i in 0..RING_SIZE {
+                loop {
+                    match cons_crq.dequeue() {
+                        Some(number) => { assert_eq!(number, 100 + i as u64); break },
+                        None => { /* spin */ },
+                    }
+                }
+            }
+        });
+
+        assert!(producer.join().is_ok());
+        assert!(consumer.join().is_ok());
     }
 }
-

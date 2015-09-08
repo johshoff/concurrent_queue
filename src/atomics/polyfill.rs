@@ -7,8 +7,7 @@ pub fn fetch_and_add(value: &mut u64, addend: u64) -> u64 {
 }
 
 pub fn test_and_set(value: &mut u64) {
-    // TODO: Is this the desired poly-fill?
-    *value = 0xffffffffffffffff; // 64 bits
+    *value = 0x8000000000000000u64; // 64 bits
 }
 
 pub fn compare_and_swap(current: &mut u64, expected: u64, new_value: u64) -> bool { // TODO: return Result to pass back values?

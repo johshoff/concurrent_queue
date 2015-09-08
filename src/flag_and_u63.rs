@@ -39,13 +39,13 @@ impl FlagAndU63 {
         self.combined &= !FLAG_VALUE;
     }
 
-    /// Return a mutable reference to the combined representation of flag+u63
-    pub fn mut_ref_combined(&mut self) -> &mut u64 {
-        &mut self.combined
+    /// Return a reference to the combined representation of flag+u63
+    pub fn ref_combined(&self) -> &u64 {
+        &self.combined
     }
 
     /// Return internal combined representation of flag+u63
-    pub fn combined(&mut self) -> u64 {
+    pub fn combined(&self) -> u64 {
         self.combined
     }
 }
