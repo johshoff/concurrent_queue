@@ -11,7 +11,7 @@ use flag_and_u63::FlagAndU63;
 pub mod node; // TODO: Using `pub` only to suppress unused warnings
 use node::{ Node, NODE_VALUE_EMPTY };
 
-pub mod atomics; // TODO: Using `pub` only to suppress unused warnings
+mod atomics;
 use atomics::x86::*;
 
 fn compare_and_swap_nodes(node: &Node, expected: &Node, new_value: &Node) -> bool {
@@ -91,15 +91,6 @@ impl CRQ {
     }
 
     pub fn dequeue(&self) -> Option<u64> {
-/*
-        // sync implementation
-        let node = &self.ring[self.head as usize % RING_SIZE];
-
-        match node.value {
-            NODE_VALUE_EMPTY => None,
-            value            => { self.head += 1; Some(value) }
-        }
-*/
         loop {
             let head = fetch_and_add(&self.head, 1);
             {
