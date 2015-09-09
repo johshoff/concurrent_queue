@@ -16,7 +16,7 @@ fn compare_and_swap_nodes(node: &Node, expected: &Node, new_value: &Node) -> boo
     compare_and_swap_2(mem_current, mem_expected, mem_new_value)
 }
 
-pub const RING_SIZE: usize = 4;
+pub const RING_SIZE: usize = 256;
 
 // fields are padded to get them on their very own cache lines.
 // This assumes that usize is 64 bits, and a cache line is 64 bytes.
