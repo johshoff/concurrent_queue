@@ -21,7 +21,7 @@ pub const RING_SIZE: usize = 4;
 pub struct CRQ { // TODO: ensure fields are on distinct cache lines
     head: u64,   // read location
     tail_and_closed: FlagAndU63, // flag: queue closed, u63: tail (write location)
-    next: *mut CRQ,
+    pub next: *const CRQ,
     ring: [Node; RING_SIZE]
 }
 
@@ -50,7 +50,7 @@ impl CRQ {
             ring
         };
 
-        CRQ { head: 0, tail_and_closed: FlagAndU63::new(false, 0), next: ptr::null_mut(), ring: ring }
+        CRQ { head: 0, tail_and_closed: FlagAndU63::new(false, 0), next: ptr::null(), ring: ring }
     }
 
     pub fn enqueue(&self, new_value: u64) -> Result<(), QueueClosed> {
