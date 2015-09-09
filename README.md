@@ -1,6 +1,8 @@
 Concurrent queue
 ----------------
 
+**This is currently fast but buggy. Please don't actually use it.**
+
 Based on the paper [Fast Concurrent Queues for x86
 Processors](http://www.cs.technion.ac.il/~mad/publications/ppopp2013-x86queues.pdf)
 by Adam Morrison and Yehuda Afek.
@@ -12,6 +14,16 @@ of structs, which is needed for using `CMPXCHG16B`.
 To run tests:
 
     cargo test
+
+Performance
+-----------
+
+Initial performance numbers are quite promising. On my laptop, sending
+1,000,000 numbers from each of two threads to be consumed by another takes
+120ms, while the same operation takes 240ms with `mpsc::channel`.
+
+A pretty big caveat to this is that some 0.1% of the numbers don't actually
+make it across. So there are some bugs to sort out!
 
 TODO
 ----
