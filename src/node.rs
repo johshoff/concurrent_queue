@@ -1,7 +1,8 @@
 use flag_and_u63::FlagAndU63;
+use std::u64;
 
 // TODO: abstract away
-pub const NODE_VALUE_EMPTY: u64 = 0;
+pub const NODE_VALUE_EMPTY: u64 = u64::MAX;
 
 #[repr(simd)]
 pub struct Align16Bytes(u64, u64);
