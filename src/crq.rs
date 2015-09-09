@@ -18,10 +18,15 @@ fn compare_and_swap_nodes(node: &Node, expected: &Node, new_value: &Node) -> boo
 
 pub const RING_SIZE: usize = 4;
 
-pub struct CRQ { // TODO: ensure fields are on distinct cache lines
-    head: u64,   // read location
-    tail_and_closed: FlagAndU63, // flag: queue closed, u63: tail (write location)
+// fields are padded to get them on their very own cache lines.
+// This assumes that usize is 64 bits, and a cache line is 64 bytes.
+pub struct CRQ {
+    head: u64,                     // read location
+    _pad_head: [usize; 7],
+    tail_and_closed: FlagAndU63,   // tail (u63, write location), closed queue (1 bit flag)
+    _pad_tail: [usize; 7],
     pub next: *const CRQ,
+    _pad_next: [usize; 7],
     ring: [Node; RING_SIZE]
 }
 
@@ -50,7 +55,8 @@ impl CRQ {
             ring
         };
 
-        CRQ { head: 0, tail_and_closed: FlagAndU63::new(false, 0), next: ptr::null(), ring: ring }
+        CRQ { head: 0, tail_and_closed: FlagAndU63::new(false, 0), next: ptr::null(), ring: ring,
+              _pad_head: [0; 7], _pad_tail: [0; 7], _pad_next: [0; 7] }
     }
 
     pub fn enqueue(&self, new_value: u64) -> Result<(), QueueClosed> {
