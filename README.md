@@ -1,7 +1,8 @@
 Concurrent queue
 ----------------
 
-**This is currently fast but buggy. Please don't actually use it.**
+**This is currently leaking memory. Please don't actually use it.** (Fixing the
+leak should be straight forward, but hasn't been prioritized)
 
 Based on the paper [Fast Concurrent Queues for x86
 Processors](http://www.cs.technion.ac.il/~mad/publications/ppopp2013-x86queues.pdf)
@@ -20,7 +21,11 @@ Performance
 
 Initial performance numbers are quite promising. On my laptop, sending
 10,000,000 numbers from each of two threads to be consumed by another takes
-1.2 seconds, while the same operation takes 2.4 seconds with `mpsc::channel`.
+1.5 seconds, while the same operation takes 2.3 seconds with `mpsc::channel`.
+
+See the
+[concurrent-speed-test](https://github.com/johshoff/concurrent_speed_test) repo
+for the test code.
 
 TODO
 ----
