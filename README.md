@@ -19,11 +19,8 @@ Performance
 -----------
 
 Initial performance numbers are quite promising. On my laptop, sending
-1,000,000 numbers from each of two threads to be consumed by another takes
-120ms, while the same operation takes 240ms with `mpsc::channel`.
-
-A pretty big caveat to this is that some 0.1% of the numbers don't actually
-make it across. So there are some bugs to sort out!
+10,000,000 numbers from each of two threads to be consumed by another takes
+1.2 seconds, while the same operation takes 2.4 seconds with `mpsc::channel`.
 
 TODO
 ----

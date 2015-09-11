@@ -79,14 +79,10 @@ pub fn fetch_and_add(destination: &u64, addend: u64) -> u64 {
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 pub fn test_and_set(destination: &u64) {
     unsafe {
-        asm!("LOCK XCHG qword ptr [RCX], RBX"
+        asm!("LOCK BTS qword ptr [RCX], 63"
              :                                 // output
-
-             : "{rbx}"(0x8000000000000000u64), // input
-               "{rcx}"(destination)
-
+             : "{rcx}"(destination)            // input
              : "{rbx}", "memory"               // clobbers
-
              : "intel"                         // options
         );
     }
@@ -131,6 +127,6 @@ mod test {
     fn test_test_and_set() {
         let mut x = 5;
         test_and_set(&mut x);
-        assert_eq!(x, 0x8000000000000000u64);
+        assert_eq!(x, 0x8000000000000005u64);
     }
 }
