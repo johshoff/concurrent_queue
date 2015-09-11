@@ -19,9 +19,13 @@ To run tests:
 Performance
 -----------
 
-Initial performance numbers are quite promising. On my laptop, sending
-10,000,000 numbers from each of two threads to be consumed by another takes
-1.5 seconds, while the same operation takes 2.3 seconds with `mpsc::channel`.
+Initial performance numbers are quite promising. On my 4 core laptop, sending
+10,000,000 numbers from each of two threads to be consumed by another takes 1.1
+seconds, while the same operation takes 2.4 seconds with `mpsc::channel`.
+Using 4 producer threads and 1 consumer thread uses 2.0 seconds with the
+concurrent channel and 4.9 seconds with `mpsc::channel`.
+
+So it seems to be about a 2x increase in speed.
 
 See the
 [concurrent-speed-test](https://github.com/johshoff/concurrent_speed_test) repo
