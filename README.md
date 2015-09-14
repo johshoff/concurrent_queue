@@ -1,5 +1,5 @@
-Concurrent queue
-----------------
+Non-blocking concurrent queue [![Build Status](https://travis-ci.org/johshoff/concurrent_queue.svg?branch=master)](https://travis-ci.org/johshoff/concurrent_queue)
+-----------------------------
 
 **This is currently leaking memory. Please don't actually use it.** (Fixing the
 leak should be straight forward, but hasn't been prioritized)
