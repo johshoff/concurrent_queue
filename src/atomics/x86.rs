@@ -10,7 +10,7 @@ pub fn compare_and_swap(destination: &u64, expected: u64, new_value: u64) -> boo
                "{rcx}"(destination),     // input
                "{rax}"(expected)
 
-             : "{rax}", "memory"         // clobbers
+             : "rax", "memory"           // clobbers
 
              : "intel"                   // options
         );
@@ -45,7 +45,7 @@ pub fn compare_and_swap_2(destination: &DoubleU64, expected: &DoubleU64, new_val
                "{rax}"(expected.high)
                "{rdx}"(expected.low)
 
-             : "{rax}", "{rdx}", "memory"    // clobbers
+             : "rax", "rdx", "memory"        // clobbers
 
              : "intel"                       // options
         );
@@ -67,7 +67,7 @@ pub fn fetch_and_add(destination: &u64, addend: u64) -> u64 {
              : "{rbx}"(addend),          // input
                "{rcx}"(destination)
 
-             : "{rbx}", "memory"         // clobbers
+             : "rbx", "memory"           // clobbers
 
              : "intel"                   // options
         );
@@ -82,7 +82,7 @@ pub fn test_and_set(destination: &u64) {
         asm!("LOCK BTS qword ptr [RCX], 63"
              :                                 // output
              : "{rcx}"(destination)            // input
-             : "{rbx}", "memory"               // clobbers
+             : "rbx", "memory"                 // clobbers
              : "intel"                         // options
         );
     }
