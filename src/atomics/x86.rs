@@ -22,7 +22,7 @@ pub fn compare_and_swap(destination: &u64, expected: u64, new_value: u64) -> boo
     value_at_dest == expected
 }
 
-#[repr(simd)] // for 16 byte alignment
+#[repr(align(16))]
 #[derive(Debug)]
 pub struct DoubleU64 {
     high: u64,

@@ -1,5 +1,4 @@
 #![feature(asm)]
-#![feature(repr_simd)]
 
 pub mod crq;
 pub mod lcrq;

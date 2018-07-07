@@ -4,20 +4,16 @@ use std::u64;
 // TODO: abstract away
 pub const NODE_VALUE_EMPTY: u64 = u64::MAX;
 
-#[repr(simd)]
-pub struct Align16Bytes(u64, u64);
-
+#[repr(align(16))]
 pub struct Node {
     index_and_safe: FlagAndU63, // highest bit: safe, remaining 63 bits: value
     value: u64,
     // TODO: pad to cache line size... Assume L2 cache?
-
-    _align: [Align16Bytes; 0],
 }
 
 impl Node {
     pub fn new(index: u64, value: u64, safe: bool) -> Node {
-        Node { index_and_safe: FlagAndU63::new(safe, index), value: value, _align: [] }
+        Node { index_and_safe: FlagAndU63::new(safe, index), value: value }
     }
 
     pub fn is_safe(&self) -> bool {
