@@ -9,11 +9,11 @@ use node::{ Node, NODE_VALUE_EMPTY };
 use atomics::x86::*;
 
 fn compare_and_swap_nodes(node: &Node, expected: &Node, new_value: &Node) -> bool {
-    let mem_current   : &DoubleU64 = unsafe { mem::transmute(node)      };
-    let mem_expected  : &DoubleU64 = unsafe { mem::transmute(expected)  };
-    let mem_new_value : &DoubleU64 = unsafe { mem::transmute(new_value) };
+    let mem_current   : &u128 = unsafe { mem::transmute(node)      };
+    let mem_expected  : &u128 = unsafe { mem::transmute(expected)  };
+    let mem_new_value : &u128 = unsafe { mem::transmute(new_value) };
 
-    compare_and_swap_2(mem_current, mem_expected, mem_new_value)
+    compare_and_swap_u128(mem_current, *mem_expected, *mem_new_value)
 }
 
 pub const RING_SIZE: usize = 256;

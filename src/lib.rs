@@ -1,4 +1,4 @@
-#![feature(asm)]
+#![feature(core_intrinsics)]
 
 pub mod crq;
 pub mod lcrq;

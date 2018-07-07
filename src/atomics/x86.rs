@@ -1,91 +1,34 @@
+#![allow(mutable_transmutes)]
 
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+use std::mem;
+use std::intrinsics::{atomic_cxchg, atomic_xadd};
+
 pub fn compare_and_swap(destination: &u64, expected: u64, new_value: u64) -> bool {
-	let value_at_dest : u64;
-    unsafe {
-        asm!("LOCK CMPXCHG qword ptr [RCX], RBX"
-             : "={rax}"(value_at_dest)   // output
+    let destination : &mut u64 = unsafe { mem::transmute(destination) };
+    let (value_at_dest, success) = unsafe { atomic_cxchg(destination, expected, new_value) };
+    assert!((value_at_dest == expected && success) || (value_at_dest != expected && !success));
 
-             : "{rbx}"(new_value),
-               "{rcx}"(destination),     // input
-               "{rax}"(expected)
-
-             : "rax", "memory"           // clobbers
-
-             : "intel"                   // options
-        );
-    }
-
-	// this information is also available through the zero flag, but it's
-	// impossible (?) to use that information without doing some sort of
-	// secondary compare outside of the asm! block
-    value_at_dest == expected
+    success
 }
 
-#[repr(align(16))]
-#[derive(Debug)]
-pub struct DoubleU64 {
-    high: u64,
-    low:  u64,
+pub fn compare_and_swap_u128(destination: &u128, expected: u128, new_value: u128) -> bool { // TODO: return Result to pass back values?
+    let destination : &mut u128 = unsafe { mem::transmute(destination) };
+    let (value_at_dest, success) = unsafe { atomic_cxchg(destination, expected, new_value) };
+    assert!((value_at_dest == expected && success) || (value_at_dest != expected && !success));
+
+    success
 }
 
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-pub fn compare_and_swap_2(destination: &DoubleU64, expected: &DoubleU64, new_value: &DoubleU64) -> bool { // TODO: return Result to pass back values?
-	let value_at_dest_high : u64;
-	let value_at_dest_low  : u64;
-
-    unsafe {
-        asm!("LOCK CMPXCHG16B [R8]"
-             : "={rax}"(value_at_dest_high), // output
-               "={rdx}"(value_at_dest_low)
-
-             : "{rbx}"(new_value.high),      // input
-               "{rcx}"(new_value.low),
-               "{r8}"(destination),
-               "{rax}"(expected.high)
-               "{rdx}"(expected.low)
-
-             : "rax", "rdx", "memory"        // clobbers
-
-             : "intel"                       // options
-        );
-    }
-
-	// this information is also available through the zero flag, but it's
-	// impossible (?) to use that information without doing some sort of
-	// secondary compare outside of the asm! block
-    value_at_dest_high == expected.high && value_at_dest_low == expected.low
-}
-
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 pub fn fetch_and_add(destination: &u64, addend: u64) -> u64 {
-	let value_at_dest : u64;
-    unsafe {
-        asm!("LOCK XADD qword ptr [RCX], RBX"
-             : "={rbx}"(value_at_dest)   // output
-
-             : "{rbx}"(addend),          // input
-               "{rcx}"(destination)
-
-             : "rbx", "memory"           // clobbers
-
-             : "intel"                   // options
-        );
-    }
+    let destination : &mut u64 = unsafe { mem::transmute(destination) };
+    let value_at_dest = unsafe { atomic_xadd(destination, addend) };
 
     value_at_dest
 }
 
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 pub fn test_and_set(destination: &u64) {
-    unsafe {
-        asm!("LOCK BTS qword ptr [RCX], 63"
-             :                                 // output
-             : "{rcx}"(destination)            // input
-             : "rbx", "memory"                 // clobbers
-             : "intel"                         // options
-        );
-    }
+    //let destination : &mut u64 = unsafe { mem::transmute(destination) };
+    //*destination = *destination | (1 << 63);
 }
 
 #[cfg(test)]
@@ -112,15 +55,17 @@ mod test {
     }
 
     #[test]
-    fn test_compare_and_swap_2_single_thread() {
-	    let mut x = DoubleU64 { high: 1, low: 2 };
-	    assert!(compare_and_swap_2(&mut x, &DoubleU64 { high: 1, low: 2 }, &DoubleU64 { high: 2, low: 3 }));
-	    assert_eq!(x.high, 2);
-	    assert_eq!(x.low , 3);
+    fn test_compare_and_swap_u128_single_thread() {
+	    let mut x  = 0x00000000000000010000000000000002u128;
+	    let expect = 0x00000000000000010000000000000002u128;
+	    let new    = 0x00000000000000020000000000000003u128;
+	    assert!(compare_and_swap_u128(&mut x, expect, new));
+	    assert_eq!(x, new);
 
-	    assert!(!compare_and_swap_2(&mut x, &DoubleU64 { high: 1, low: 2 }, &DoubleU64 { high: 3, low: 2 }));
-	    assert_eq!(x.high, 2);
-	    assert_eq!(x.low , 3);
+	    // won't swap new for newer
+	    let newer = 0x00000000000000030000000000000002u128;
+	    assert!(!compare_and_swap_u128(&mut x, expect, newer));
+	    assert_eq!(x, new);
     }
 
     #[test]
